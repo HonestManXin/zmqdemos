@@ -3,15 +3,21 @@
 from threading import Thread, Lock
 import time
 import zmq
-import random
 import sys
 sys.path.append("../..")
 from utils.zmqutils import ZMQUtils
 
 
+"""
+REQ套接字在发送消息时会向头部添加一个空帧，接收时又会自动移除
+ROUTER会在所有收到的消息前添加消息来源的地址
+"""
+
+
 front_addr = "ipc:///tmp/frontend.ipc"
 back_addr = "ipc:///tmp/backend.ipc"
 LOCK = Lock()
+
 
 class ClientThread(Thread):
     def __init__(self):
@@ -25,6 +31,7 @@ class ClientThread(Thread):
             print "send get reply:", response
 
 WORK_COUNT = 0
+
 
 class WorkerThread(Thread):
     def __init__(self):

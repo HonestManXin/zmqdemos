@@ -126,6 +126,12 @@ class ZMQUtils(object):
         return cls._create_conn(addr, zmq.DEALER, **kwargs)
 
     @classmethod
+    def create_durable_dealer(cls, addr, identify, **kwargs):
+        kwargs = kwargs or {}
+        kwargs[cls._identify] = identify
+        return cls._create_conn(addr, zmq.DEALER, **kwargs)
+
+    @classmethod
     def create_poller(cls):
         return zmq.Poller()
 
