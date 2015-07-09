@@ -22,7 +22,10 @@ class ZMQUtils(object):
         if cls._identify in kwargs:
             identify = kwargs[cls._identify]
             recver.setsockopt(zmq.IDENTITY, identify)
-        recver.bind(addr)
+        if not isinstance(addr, list):
+            addr = [addr]
+        for zmq_addr in addr:
+            recver.bind(zmq_addr)
         return recver
 
     @classmethod
@@ -34,7 +37,10 @@ class ZMQUtils(object):
         if cls._identify in kwargs:
             identify = kwargs[cls._identify]
             sender.setsockopt(zmq.IDENTITY, identify)
-        sender.connect(addr)
+        if not isinstance(addr, list):
+            addr = [addr]
+        for zmq_addr in addr:
+            sender.connect(zmq_addr)
         return sender
 
     @classmethod
@@ -116,6 +122,12 @@ class ZMQUtils(object):
     @classmethod
     def create_conn_router(cls, addr, **kwargs):
         return cls._create_conn(addr, zmq.ROUTER, **kwargs)
+
+    @classmethod
+    def create_durable_router(cls, addr, identify, **kwargs):
+        kwargs = kwargs or {}
+        kwargs[cls._identify] = identify
+        return cls._create_conn(addr, **kwargs)
 
     @classmethod
     def create_bind_dealer(cls, addr, **kwargs):
