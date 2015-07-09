@@ -1,18 +1,25 @@
 # -*- coding: utf-8 -*-
 import zmq
 import time
-import random
 import string
-from threading import Thread
+from threading import Thread, Lock
 import sys
 sys.path.append("../..")
 from utils.zmqutils import ZMQUtils
+from utils.server import BaseZmqServer
+
+
+"""
+在使用dealer-router方式时在标示符和msg之间没有添加空消息
+貌似只有req-router方式时才会插入空消息
+"""
 
 
 dealer_addr = "ipc:///tmp/dealer.sock"
-worker_addr = "inproc://backend"
+worker_addr = "ipc:///tmp/backend.sock"
 
-identifies = string.letters[:5]
+identifies = string.letters[:10]
+GLOCK = Lock()
 
 
 class AsyncClient(Thread):
@@ -23,13 +30,16 @@ class AsyncClient(Thread):
         self.poll = ZMQUtils.create_poller()
         self.poll.register(self.dealer, zmq.POLLIN)
 
+        self.daemon = True
+
     def run(self):
         count = 0
         while True:
-            for i in xrange(100):
-                sockets = dict(self.poll.poll(10))
+            for i in xrange(10):
+                sockets = dict(self.poll.poll(100))
                 if self.dealer in sockets:
-                    print "recv:", self.dealer.recv()
+                    with GLOCK:
+                        print "client %s recv: %s" % (self.identify, self.dealer.recv())
 
             msg = self.identify + str(count)
             self.dealer.send(msg)
@@ -42,25 +52,32 @@ class WorkerThread(Thread):
         super(WorkerThread, self).__init__()
         self.recver = ZMQUtils.create_conn_dealer(worker_addr)
 
+        self.daemon = True
+
     def run(self):
 
         while True:
             parts = self.recver.recv_multipart()
-            for i in xrange(random.randint(0, 4)):
-                msg = parts[1]
-                msg = msg + "_" + str(i)
+            raw_msg = parts[1]
+            for i in xrange(1):
+                msg = raw_msg + "_" + str(i)
                 parts[1] = msg
                 self.recver.send_multipart(parts)
+                with GLOCK:
+                    print "work send", parts
 
 
-class Server(object):
+class Server(BaseZmqServer):
 
     def __init__(self):
+        super(Server, self).__init__()
         self.front = ZMQUtils.create_bind_router(dealer_addr)
         self.back = ZMQUtils.create_bind_dealer(worker_addr)
         self.poll = ZMQUtils.create_poller()
+
         self.poll.register(self.front, zmq.POLLIN)
         self.poll.register(self.back, zmq.POLLIN)
+
         self._create_thread()
 
     @classmethod
@@ -68,20 +85,20 @@ class Server(object):
         for ident in identifies:
             t = AsyncClient(ident)
             t.start()
-        for _ in xrange(1):
+        for _ in xrange(5):
             t = WorkerThread()
             t.start()
+        time.sleep(1)
 
     def run(self):
-        time.sleep(1)
         sockets = dict(self.poll.poll())
         if self.front in sockets:
             parts = self.front.recv_multipart()
-            print parts
             self.back.send_multipart(parts)
+
         if self.back in sockets:
             parts = self.back.recv_multipart()
             self.front.send_multipart(parts)
 
 s = Server()
-s.run()
+s.start()
