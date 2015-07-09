@@ -14,7 +14,7 @@ class ZMQUtils(object):
         return zmq.Context()
 
     @classmethod
-    def _create_bind(cls, addr, socket_type=zmq.PUSH, **kwargs):
+    def _create_bind(cls, addr, socket_type, **kwargs):
         recver = cls.context.socket(socket_type)
         if cls._hwm in kwargs:
             hwm = kwargs[cls._hwm]
@@ -127,7 +127,7 @@ class ZMQUtils(object):
     def create_durable_router(cls, addr, identify, **kwargs):
         kwargs = kwargs or {}
         kwargs[cls._identify] = identify
-        return cls._create_conn(addr, **kwargs)
+        return cls._create_conn(addr, zmq.ROUTER, **kwargs)
 
     @classmethod
     def create_bind_dealer(cls, addr, **kwargs):
